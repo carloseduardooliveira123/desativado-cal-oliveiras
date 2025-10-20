@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ROI Tracker Cal Oliveiras</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+        }
+        .font-montserrat {
+            font-family: 'Montserrat', sans-serif;
+        }
+        #root {
+            min-height: 100vh;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const App = () => {
+            const [screen, setScreen] = useState('splash');
+            const [user, setUser] = useState(null);
+            const [empreendimentos, setEmpreendimentos] = useState([]);
+            const [selectedEmp, setSelectedEmp] = useState(null);
+            const [editingEmp, setEditingEmp] = useState(null);
+            const [showPinSetup, setShowPinSetup] = useState(false);
+            const [simData, setSimData] = useState({
+                valorImovel: '',
+                valorEntrada: '',
+                taxaValorizacao: '5',
+                periodoAnos: '5',
+                aluguelMensal: '',
+                custosMensais: ''
+            });
+            const [simResult, setSimResult] = useState(null);
+
+            useEffect(() => {
+                const timer = setTimeout(() => {
+                    const savedUser = localStorage.getItem('calOliveirasUser');
+                    const savedEmps = localStorage.getItem('calOliveirasEmpreendimentos');
+                    if (savedEmps) {
+                        setEmpreendimentos(JSON.parse(savedEmps));
+                    }
+                    if (savedUser) {
+                        setUser(JSON.parse(savedUser));
+                        setScreen('home');
+                    } else {
+                        setScreen('login');
+                    }
+                }, 2500);
+                return () => clearTimeout(timer);
+            }, []);
+
+            const saveEmpreendimentos = (emps) => {
+                setEmpreendimentos(emps);
+                localStorage.setItem('calOliveirasEmpreendimentos', JSON.stringify(emps));
+            };
+
+            const calcularROI = () => {
+                const valor = parseFloat(simData.valorImovel);
+                const entrada = parseFloat(simData.valorEntrada);
+                const taxa = parseFloat(simData.taxaValorizacao) / 100;
+                const anos = parseInt(simData.periodoAnos);
+                const aluguel = parseFloat(simData.aluguelMensal) || 0;
+                const custos = parseFloat(simData.custosMensais) || 0;
+
+                if (!valor || !entrada) {
+                    alert('Preencha pelo menos o valor do imóvel e entrada!');
+                    return;
+                }
+
+                const valorFuturo = valor * Math.pow(1 + taxa, anos);
+                const valorizacao = valorFuturo - valor;
+                const rendaTotal = (aluguel - custos) * 12 * anos;
+                const ganhoTotal = valorizacao + rendaTotal;
+                const roi = (ganhoTotal / entrada) * 100;
+                const roiAnual = roi / anos;
+
+                setSimResult({
+                    investimentoInicial: entrada,
+                    valorAtual: valor,
+                    valorFuturo: valorFuturo,
+                    valorizacao: valorizacao,
+                    rendaAluguel: rendaTotal,
+                    ganhoTotal: ganhoTotal,
+                    roi: roi,
+                    roiAnual: roiAnual
+                });
+            };
+
+            const BottomNav = () => (
+                <div style={{position: 'fixed', bottom: 0, left: 0, right: 0, background: 'white', boxShadow: '0 -2px 10px rgba(0,0,0,0.1)', display: 'flex', justifyContent: 'space-around', padding: '0.75rem 0', zIndex: 100}}>
+                    {[
+                        {icon: '🏠', label: 'Home', screen: 'home'},
+                        {icon: '📊', label: 'Simulador', screen: 'simulador'},
+                        {icon: '🏢', label: 'Empreend.', screen: 'empreendimentos'},
+                        {icon: '⚙️', label: 'Config', screen: 'config'}
+                    ].map(item => (
+                        <button
+                            key={item.screen}
+                            onClick={() => setScreen(item.screen)}
+                            style={{background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', padding: '0.5rem', flex: 1}}
+                        >
+                            <span style={{fontSize: '1.5rem', opacity: screen === item.screen ? 1 : 0.5}}>{item.icon}</span>
+                            <span style={{fontSize: '0.7rem', color: screen === item.screen ? '#8D927D' : '#9ca3af', fontWeight: screen === item.screen ? 'bold' : 'normal'}}>{item.label}</span>
+                        </button>
+                    ))}
+                </div>
+            );
+
+            if (screen === 'splash') {
+                return (
+                    <div style={{height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #8D927D 0%, #493928 100%)', color: 'white'}}>
+                        <div style={{textAlign: 'center', animation: 'fadeIn 1s ease-in'}}>
+                            <div style={{fontSize: '5rem', marginBottom: '1rem'}}>🏢</div>
+                            <h1 className="font-montserrat" style={{fontSize: '2rem', fontWeight: 'bold', letterSpacing: '-0.5px', marginBottom: '0.5rem'}}>Cal Oliveiras</h1>
+                            <p style={{fontSize: '1rem', opacity: 0.9, fontWeight: '300'}}>Corretor Particular</p>
+                            <div style={{marginTop: '3rem', fontSize: '0.875rem', opacity: 0.7}}>
+                                <div style={{width: '40px', height: '40px', border: '3px solid rgba(255,255,255,0.3)', borderTop: '3px solid white', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto'}}></div>
+                            </div>
+
+                        <div style={{padding: '1.5rem'}}>
+                            {empreendimentos.length === 0 ? (
+                                <div style={{background: 'white', padding: '3rem', borderRadius: '1rem', textAlign: 'center', marginTop: '2rem'}}>
+                                    <span style={{fontSize: '4rem'}}>🏗️</span>
+                                    <h3 className="font-montserrat" style={{fontSize: '1.25rem', marginTop: '1rem', color: '#313128'}}>Nenhum empreendimento cadastrado</h3>
+                                    <p style={{color: '#a0b5a8', marginTop: '0.5rem'}}>Clique em "+ Adicionar" para cadastrar o primeiro</p>
+                                </div>
+                            ) : (
+                                <div style={{display: 'grid', gap: '1rem'}}>
+                                    {empreendimentos.map((emp, idx) => (
+                                        <div
+                                            key={idx}
+                                            onClick={() => setSelectedEmp(emp)}
+                                            style={{background: 'white', borderRadius: '1rem', padding: '1.25rem', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', transition: 'transform 0.2s'}}
+                                            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                                            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                                        >
+                                            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'start'}}>
+                                                <div style={{flex: 1}}>
+                                                    <h3 className="font-montserrat" style={{fontSize: '1.125rem', fontWeight: 'bold', color: '#313128'}}>{emp.nome}</h3>
+                                                    <p style={{fontSize: '0.875rem', color: '#a0b5a8', marginTop: '0.25rem'}}>{emp.construtora}</p>
+                                                    <div style={{display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap'}}>
+                                                        <span style={{background: '#8D927D', color: 'white', padding: '0.25rem 0.75rem', borderRadius: '1rem', fontSize: '0.75rem'}}>{emp.bairro}</span>
+                                                        <span style={{background: emp.status === 'Lançamento' ? '#493928' : emp.status === 'Em obras' ? '#f59e0b' : '#10b981', color: 'white', padding: '0.25rem 0.75rem', borderRadius: '1rem', fontSize: '0.75rem'}}>{emp.status}</span>
+                                                        <span style={{background: '#e5e7eb', color: '#313128', padding: '0.25rem 0.75rem', borderRadius: '1rem', fontSize: '0.75rem'}}>{emp.tipo}</span>
+                                                    </div>
+                                                    <p className="font-montserrat" style={{fontSize: '1rem', fontWeight: 'bold', color: '#8D927D', marginTop: '0.75rem'}}>
+                                                        R$ {Number(emp.precoMin).toLocaleString('pt-BR')} - R$ {Number(emp.precoMax).toLocaleString('pt-BR')}
+                                                    </p>
+                                                </div>
+                                                <span style={{fontSize: '1.5rem'}}>→</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {selectedEmp && (
+                            <div style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 50}} onClick={() => setSelectedEmp(null)}>
+                                <div style={{background: 'white', width: '100%', maxHeight: '90vh', overflow: 'auto', borderRadius: '1.5rem 1.5rem 0 0', padding: '1.5rem'}} onClick={(e) => e.stopPropagation()}>
+                                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem'}}>
+                                        <h2 className="font-montserrat" style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#313128'}}>{selectedEmp.nome}</h2>
+                                        <button onClick={() => setSelectedEmp(null)} style={{background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer'}}>✕</button>
+                                    </div>
+                                    
+                                    <div style={{marginBottom: '1rem'}}>
+                                        <p style={{color: '#a0b5a8', fontSize: '0.875rem'}}>Construtora</p>
+                                        <p className="font-montserrat" style={{fontWeight: 'bold', fontSize: '1rem', color: '#313128'}}>{selectedEmp.construtora}</p>
+                                    </div>
+
+                                    <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem'}}>
+                                        <div>
+                                            <p style={{color: '#a0b5a8', fontSize: '0.875rem'}}>Bairro</p>
+                                            <p style={{fontWeight: 'bold', color: '#313128'}}>{selectedEmp.bairro}</p>
+                                        </div>
+                                        <div>
+                                            <p style={{color: '#a0b5a8', fontSize: '0.875rem'}}>Status</p>
+                                            <p style={{fontWeight: 'bold', color: '#313128'}}>{selectedEmp.status}</p>
+                                        </div>
+                                    </div>
+
+                                    <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem'}}>
+                                        <div>
+                                            <p style={{color: '#a0b5a8', fontSize: '0.875rem'}}>Tipo</p>
+                                            <p style={{fontWeight: 'bold', color: '#313128'}}>{selectedEmp.tipo}</p>
+                                        </div>
+                                        <div>
+                                            <p style={{color: '#a0b5a8', fontSize: '0.875rem'}}>Entrega</p>
+                                            <p style={{fontWeight: 'bold', color: '#313128'}}>{selectedEmp.entrega}</p>
+                                        </div>
+                                    </div>
+
+                                    <div style={{marginBottom: '1rem'}}>
+                                        <p style={{color: '#a0b5a8', fontSize: '0.875rem'}}>Faixa de Preço</p>
+                                        <p className="font-montserrat" style={{fontWeight: 'bold', fontSize: '1.125rem', color: '#8D927D'}}>
+                                            R$ {Number(selectedEmp.precoMin).toLocaleString('pt-BR')} - R$ {Number(selectedEmp.precoMax).toLocaleString('pt-BR')}
+                                        </p>
+                                    </div>
+
+                                    {selectedEmp.metragens && (
+                                        <div style={{marginBottom: '1rem'}}>
+                                            <p style={{color: '#a0b5a8', fontSize: '0.875rem'}}>Metragens Disponíveis</p>
+                                            <p style={{fontWeight: 'bold', color: '#313128'}}>{selectedEmp.metragens}</p>
+                                        </div>
+                                    )}
+
+                                    {selectedEmp.descricao && (
+                                        <div style={{marginBottom: '1rem'}}>
+                                            <p style={{color: '#a0b5a8', fontSize: '0.875rem'}}>Descrição</p>
+                                            <p style={{color: '#313128', lineHeight: '1.5'}}>{selectedEmp.descricao}</p>
+                                        </div>
+                                    )}
+
+                                    {selectedEmp.diferenciais && (
+                                        <div style={{marginBottom: '1rem'}}>
+                                            <p style={{color: '#a0b5a8', fontSize: '0.875rem'}}>Diferenciais</p>
+                                            <p style={{color: '#313128', lineHeight: '1.5'}}>{selectedEmp.diferenciais}</p>
+                                        </div>
+                                    )}
+
+                                    <div style={{display: 'grid', gap: '0.75rem', marginTop: '1.5rem'}}>
+                                        <button
+                                            onClick={() => {
+                                                setEditingEmp(selectedEmp);
+                                                setSelectedEmp(null);
+                                            }}
+                                            style={{background: '#8D927D', color: 'white', border: 'none', padding: '1rem', borderRadius: '0.75rem', fontWeight: 'bold', cursor: 'pointer'}}
+                                        >
+                                            ✏️ Editar Empreendimento
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                if (confirm('Deseja excluir este empreendimento?')) {
+                                                    saveEmpreendimentos(empreendimentos.filter(e => e.nome !== selectedEmp.nome));
+                                                    setSelectedEmp(null);
+                                                }
+                                            }}
+                                            style={{background: '#ef4444', color: 'white', border: 'none', padding: '1rem', borderRadius: '0.75rem', fontWeight: 'bold', cursor: 'pointer'}}
+                                        >
+                                            🗑️ Excluir Empreendimento
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {editingEmp && (
+                            <div style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 50}} onClick={() => setEditingEmp(null)}>
+                                <div style={{background: 'white', width: '100%', maxHeight: '90vh', overflow: 'auto', borderRadius: '1.5rem 1.5rem 0 0', padding: '1.5rem'}} onClick={(e) => e.stopPropagation()}>
+                                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem'}}>
+                                        <h2 className="font-montserrat" style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#313128'}}>
+                                            {editingEmp.nome ? 'Editar' : 'Adicionar'} Empreendimento
+                                        </h2>
+                                        <button onClick={() => setEditingEmp(null)} style={{background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer'}}>✕</button>
+                                    </div>
+
+                                    <form onSubmit={(e) => {
+                                        e.preventDefault();
+                                        const formData = new FormData(e.target);
+                                        const newEmp = {
+                                            nome: formData.get('nome'),
+                                            construtora: formData.get('construtora'),
+                                            bairro: formData.get('bairro'),
+                                            status: formData.get('status'),
+                                            tipo: formData.get('tipo'),
+                                            precoMin: formData.get('precoMin'),
+                                            precoMax: formData.get('precoMax'),
+                                            entrega: formData.get('entrega'),
+                                            metragens: formData.get('metragens'),
+                                            descricao: formData.get('descricao'),
+                                            diferenciais: formData.get('diferenciais')
+                                        };
+                                        
+                                        if (editingEmp.nome) {
+                                            saveEmpreendimentos(empreendimentos.map(e => e.nome === editingEmp.nome ? newEmp : e));
+                                        } else {
+                                            saveEmpreendimentos([...empreendimentos, newEmp]);
+                                        }
+                                        setEditingEmp(null);
+                                    }}>
+                                        <div style={{display: 'grid', gap: '1rem'}}>
+                                            <div>
+                                                <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 'bold', color: '#313128', marginBottom: '0.5rem'}}>Nome do Empreendimento</label>
+                                                <input name="nome" defaultValue={editingEmp.nome || ''} required style={{width: '100%', padding: '0.75rem', border: '2px solid #8D927D', borderRadius: '0.5rem', fontSize: '1rem'}} />
+                                            </div>
+
+                                            <div>
+                                                <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 'bold', color: '#313128', marginBottom: '0.5rem'}}>Construtora</label>
+                                                <input name="construtora" defaultValue={editingEmp.construtora || ''} required style={{width: '100%', padding: '0.75rem', border: '2px solid #8D927D', borderRadius: '0.5rem', fontSize: '1rem'}} />
+                                            </div>
+
+                                            <div>
+                                                <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 'bold', color: '#313128', marginBottom: '0.5rem'}}>Bairro</label>
+                                                <input name="bairro" defaultValue={editingEmp.bairro || ''} required style={{width: '100%', padding: '0.75rem', border: '2px solid #8D927D', borderRadius: '0.5rem', fontSize: '1rem'}} />
+                                            </div>
+
+                                            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
+                                                <div>
+                                                    <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 'bold', color: '#313128', marginBottom: '0.5rem'}}>Status</label>
+                                                    <select name="status" defaultValue={editingEmp.status || 'Lançamento'} required style={{width: '100%', padding: '0.75rem', border: '2px solid #8D927D', borderRadius: '0.5rem', fontSize: '1rem'}}>
+                                                        <option>Lançamento</option>
+                                                        <option>Em obras</option>
+                                                        <option>Pronto</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 'bold', color: '#313128', marginBottom: '0.5rem'}}>Tipo</label>
+                                                    <select name="tipo" defaultValue={editingEmp.tipo || 'Apartamento'} required style={{width: '100%', padding: '0.75rem', border: '2px solid #8D927D', borderRadius: '0.5rem', fontSize: '1rem'}}>
+                                                        <option>Apartamento</option>
+                                                        <option>Casa</option>
+                                                        <option>Cobertura</option>
+                                                        <option>Terreno</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
+                                                <div>
+                                                    <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 'bold', color: '#313128', marginBottom: '0.5rem'}}>Preço Mínimo (R$)</label>
+                                                    <input type="number" name="precoMin" defaultValue={editingEmp.precoMin || ''} required style={{width: '100%', padding: '0.75rem', border: '2px solid #8D927D', borderRadius: '0.5rem', fontSize: '1rem'}} />
+                                                </div>
+                                                <div>
+                                                    <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 'bold', color: '#313128', marginBottom: '0.5rem'}}>Preço Máximo (R$)</label>
+                                                    <input type="number" name="precoMax" defaultValue={editingEmp.precoMax || ''} required style={{width: '100%', padding: '0.75rem', border: '2px solid #8D927D', borderRadius: '0.5rem', fontSize: '1rem'}} />
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 'bold', color: '#313128', marginBottom: '0.5rem'}}>Previsão de Entrega</label>
+                                                <input name="entrega" placeholder="Ex: Dez/2026" defaultValue={editingEmp.entrega || ''} required style={{width: '100%', padding: '0.75rem', border: '2px solid #8D927D', borderRadius: '0.5rem', fontSize: '1rem'}} />
+                                            </div>
+
+                                            <div>
+                                                <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 'bold', color: '#313128', marginBottom: '0.5rem'}}>Metragens Disponíveis</label>
+                                                <input name="metragens" placeholder="Ex: 45m², 60m²" defaultValue={editingEmp.metragens || ''} style={{width: '100%', padding: '0.75rem', border: '2px solid #8D927D', borderRadius: '0.5rem', fontSize: '1rem'}} />
+                                            </div>
+
+                                            <div>
+                                                <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 'bold', color: '#313128', marginBottom: '0.5rem'}}>Descrição</label>
+                                                <textarea name="descricao" rows="3" defaultValue={editingEmp.descricao || ''} style={{width: '100%', padding: '0.75rem', border: '2px solid #8D927D', borderRadius: '0.5rem', fontSize: '1rem', fontFamily: 'inherit'}} />
+                                            </div>
+
+                                            <div>
+                                                <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 'bold', color: '#313128', marginBottom: '0.5rem'}}>Diferenciais</label>
+                                                <textarea name="diferenciais" rows="3" placeholder="Ex: Piscina, churrasqueira" defaultValue={editingEmp.diferenciais || ''} style={{width: '100%', padding: '0.75rem', border: '2px solid #8D927D', borderRadius: '0.5rem', fontSize: '1rem', fontFamily: 'inherit'}} />
+                                            </div>
+
+                                            <button type="submit" style={{background: '#8D927D', color: 'white', border: 'none', padding: '1rem', borderRadius: '0.75rem', fontWeight: 'bold', fontSize: '1.125rem', cursor: 'pointer', marginTop: '1rem'}}>
+                                                {editingEmp.nome ? '✓ Salvar' : '+ Cadastrar'}
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        )}
+
+                        <BottomNav />
+                    </div>
+                );
+            }
+
+            if (screen === 'config') {
+                const hasPin = localStorage.getItem('calOliveirasPin');
+                
+                return (
+                    <div style={{paddingBottom: '5rem', minHeight: '100vh', background: 'linear-gradient(135deg, #8D927D 0%, #493928 100%)'}}>
+                        <div style={{background: 'rgba(255,255,255,0.95)', padding: '1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', position: 'sticky', top: 0, zIndex: 10}}>
+                            <h1 className="font-montserrat" style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#313128'}}>⚙️ Configurações</h1>
+                        </div>
+
+                        <div style={{padding: '1.5rem'}}>
+                            <div style={{background: 'white', borderRadius: '1rem', padding: '1.5rem', marginBottom: '1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.1)'}}>
+                                <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+                                    <div style={{width: '60px', height: '60px', borderRadius: '50%', background: 'linear-gradient(135deg, #8D927D, #493928)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.75rem', color: 'white'}}>
+                                        👤
+                                    </div>
+                                    <div>
+                                        <p className="font-montserrat" style={{fontSize: '1.25rem', fontWeight: 'bold', color: '#313128'}}>{user?.name || 'Usuário'}</p>
+                                        <p style={{fontSize: '0.875rem', color: '#a0b5a8'}}>{user?.email || 'email@exemplo.com'}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style={{background: 'white', borderRadius: '1rem', padding: '1.5rem', marginBottom: '1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.1)'}}>
+                                <h3 className="font-montserrat" style={{fontSize: '1.125rem', fontWeight: 'bold', color: '#313128', marginBottom: '1rem'}}>🔒 Segurança</h3>
+                                
+                                <button
+                                    onClick={() => setShowPinSetup(true)}
+                                    style={{width: '100%', background: '#8D927D', color: 'white', border: 'none', padding: '1rem', borderRadius: '0.75rem', fontWeight: 'bold', cursor: 'pointer', marginBottom: '0.75rem'}}
+                                >
+                                    {hasPin ? '🔄 Alterar PIN' : '🔐 Configurar PIN'}
+                                </button>
+
+                                {hasPin && (
+                                    <button
+                                        onClick={() => {
+                                            if (confirm('Deseja remover o PIN de segurança?')) {
+                                                localStorage.removeItem('calOliveirasPin');
+                                                alert('PIN removido com sucesso!');
+                                            }
+                                        }}
+                                        style={{width: '100%', background: '#ef4444', color: 'white', border: 'none', padding: '1rem', borderRadius: '0.75rem', fontWeight: 'bold', cursor: 'pointer'}}
+                                    >
+                                        🗑️ Remover PIN
+                                    </button>
+                                )}
+                            </div>
+
+                            <div style={{background: 'white', borderRadius: '1rem', padding: '1.5rem', marginBottom: '1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.1)'}}>
+                                <h3 className="font-montserrat" style={{fontSize: '1.125rem', fontWeight: 'bold', color: '#313128', marginBottom: '1rem'}}>💾 Dados</h3>
+                                
+                                <div style={{marginBottom: '0.75rem'}}>
+                                    <p style={{fontSize: '0.875rem', color: '#a0b5a8'}}>Empreendimentos cadastrados</p>
+                                    <p className="font-montserrat" style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#8D927D'}}>{empreendimentos.length}</p>
+                                </div>
+
+                                <button
+                                    onClick={() => {
+                                        if (confirm('Isso irá apagar TODOS os empreendimentos. Continuar?')) {
+                                            saveEmpreendimentos([]);
+                                            alert('Dados limpos!');
+                                        }
+                                    }}
+                                    style={{width: '100%', background: '#ef4444', color: 'white', border: 'none', padding: '1rem', borderRadius: '0.75rem', fontWeight: 'bold', cursor: 'pointer'}}
+                                >
+                                    🗑️ Limpar Dados
+                                </button>
+                            </div>
+
+                            <div style={{background: 'white', borderRadius: '1rem', padding: '1.5rem', marginBottom: '1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.1)'}}>
+                                <h3 className="font-montserrat" style={{fontSize: '1.125rem', fontWeight: 'bold', color: '#313128', marginBottom: '1rem'}}>ℹ️ Sobre</h3>
+                                <p style={{fontSize: '0.875rem', color: '#a0b5a8', lineHeight: '1.5'}}>
+                                    ROI Tracker Cal Oliveiras<br/>
+                                    Versão 1.3 - Brusque Edition
+                                </p>
+                            </div>
+
+                            <button
+                                onClick={() => {
+                                    if (confirm('Deseja sair da conta?')) {
+                                        localStorage.removeItem('calOliveirasUser');
+                                        setUser(null);
+                                        setScreen('login');
+                                    }
+                                }}
+                                style={{width: '100%', background: '#493928', color: 'white', border: 'none', padding: '1rem', borderRadius: '0.75rem', fontWeight: 'bold', cursor: 'pointer'}}
+                            >
+                                🚪 Sair
+                            </button>
+                        </div>
+
+                        {showPinSetup && (
+                            <div style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem'}} onClick={() => setShowPinSetup(false)}>
+                                <div style={{background: 'white', width: '100%', maxWidth: '400px', borderRadius: '1.5rem', padding: '2rem'}} onClick={(e) => e.stopPropagation()}>
+                                    <div style={{textAlign: 'center', marginBottom: '1.5rem'}}>
+                                        <span style={{fontSize: '3rem'}}>🔐</span>
+                                        <h2 className="font-montserrat" style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#313128', marginTop: '1rem'}}>
+                                            {hasPin ? 'Alterar PIN' : 'Configurar PIN'}
+                                        </h2>
+                                        <p style={{fontSize: '0.875rem', color: '#a0b5a8', marginTop: '0.5rem'}}>
+                                            PIN de 4 dígitos
+                                        </p>
+                                    </div>
+
+                                    <form onSubmit={(e) => {
+                                        e.preventDefault();
+                                        const formData = new FormData(e.target);
+                                        const pin = formData.get('pin');
+                                        const confirmPin = formData.get('confirmPin');
+
+                                        if (pin.length !== 4 || !/^\d+$/.test(pin)) {
+                                            alert('O PIN deve ter 4 números!');
+                                            return;
+                                        }
+
+                                        if (pin !== confirmPin) {
+                                            alert('Os PINs não coincidem!');
+                                            return;
+                                        }
+
+                                        localStorage.setItem('calOliveirasPin', pin);
+                                        alert('PIN configurado!');
+                                        setShowPinSetup(false);
+                                    }}>
+                                        <div style={{marginBottom: '1rem'}}>
+                                            <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 'bold', color: '#313128', marginBottom: '0.5rem'}}>Novo PIN</label>
+                                            <input 
+                                                type="password" 
+                                                name="pin" 
+                                                maxLength="4" 
+                                                required 
+                                                style={{width: '100%', padding: '1rem', border: '2px solid #8D927D', borderRadius: '0.5rem', fontSize: '1.5rem', textAlign: 'center', letterSpacing: '0.5rem'}} 
+                                            />
+                                        </div>
+
+                                        <div style={{marginBottom: '1.5rem'}}>
+                                            <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 'bold', color: '#313128', marginBottom: '0.5rem'}}>Confirmar PIN</label>
+                                            <input 
+                                                type="password" 
+                                                name="confirmPin" 
+                                                maxLength="4" 
+                                                required 
+                                                style={{width: '100%', padding: '1rem', border: '2px solid #8D927D', borderRadius: '0.5rem', fontSize: '1.5rem', textAlign: 'center', letterSpacing: '0.5rem'}} 
+                                            />
+                                        </div>
+
+                                        <button 
+                                            type="submit" 
+                                            style={{width: '100%', background: '#8D927D', color: 'white', border: 'none', padding: '1rem', borderRadius: '0.75rem', fontWeight: 'bold', fontSize: '1.125rem', cursor: 'pointer', marginBottom: '0.75rem'}}
+                                        >
+                                            Salvar
+                                        </button>
+
+                                        <button 
+                                            type="button"
+                                            onClick={() => setShowPinSetup(false)}
+                                            style={{width: '100%', background: '#e5e7eb', color: '#313128', border: 'none', padding: '1rem', borderRadius: '0.75rem', fontWeight: 'bold', cursor: 'pointer'}}
+                                        >
+                                            Cancelar
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        )}
+
+                        <BottomNav />
+                    </div>
+                );
+            }
+
+            return (
+                <div style={{paddingBottom: '5rem', padding: '2rem', textAlign: 'center'}}>
+                    <h2 className="font-montserrat" style={{fontSize: '1.5rem', marginBottom: '1rem'}}>Tela não encontrada</h2>
+                    <BottomNav />
+                </div>
+            );
+        };
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (screen === 'login') {
+                return (
+                    <div style={{minHeight: '100vh', background: 'linear-gradient(135deg, #8D927D 0%, #493928 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem'}}>
+                        <div style={{width: '100%', maxWidth: '400px'}}>
+                            <div style={{textAlign: 'center', marginBottom: '3rem', color: 'white'}}>
+                                <div style={{fontSize: '4rem', marginBottom: '1rem'}}>🏢</div>
+                                <h1 className="font-montserrat" style={{fontSize: '1.75rem', fontWeight: 'bold', marginBottom: '0.5rem'}}>Cal Oliveiras</h1>
+                                <p style={{fontSize: '0.875rem', opacity: 0.9}}>ROI Tracker - Brusque Edition</p>
+                            </div>
+
+                            <div style={{background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(10px)', padding: '1.5rem', borderRadius: '1rem', marginBottom: '2rem', textAlign: 'center'}}>
+                                <p style={{color: 'white', fontSize: '0.9rem', fontStyle: 'italic', lineHeight: '1.6'}}>
+                                    "O dinheiro é feito na COMPRA,<br/>não na venda."
+                                </p>
+                            </div>
+
+                            <form onSubmit={(e) => {
+                                e.preventDefault();
+                                const formData = new FormData(e.target);
+                                const userData = {
+                                    name: formData.get('name'),
+                                    email: formData.get('email')
+                                };
+                                localStorage.setItem('calOliveirasUser', JSON.stringify(userData));
+                                setUser(userData);
+                                setScreen('home');
+                            }} style={{background: 'white', padding: '2rem', borderRadius: '1rem', boxShadow: '0 10px 40px rgba(0,0,0,0.2)'}}>
+                                <div style={{marginBottom: '1.25rem'}}>
+                                    <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 'bold', color: '#313128', marginBottom: '0.5rem'}}>Nome Completo</label>
+                                    <input name="name" required style={{width: '100%', padding: '0.875rem', border: '2px solid #8D927D', borderRadius: '0.5rem', fontSize: '1rem'}} placeholder="Seu nome" />
+                                </div>
+                                <div style={{marginBottom: '1.5rem'}}>
+                                    <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 'bold', color: '#313128', marginBottom: '0.5rem'}}>E-mail</label>
+                                    <input name="email" type="email" required style={{width: '100%', padding: '0.875rem', border: '2px solid #8D927D', borderRadius: '0.5rem', fontSize: '1rem'}} placeholder="seu@email.com" />
+                                </div>
+                                <button type="submit" className="font-montserrat" style={{width: '100%', background: 'linear-gradient(135deg, #8D927D, #493928)', color: 'white', border: 'none', padding: '1rem', borderRadius: '0.5rem', fontSize: '1.125rem', fontWeight: 'bold', cursor: 'pointer'}}>
+                                    Entrar →
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (screen === 'home') {
+                return (
+                    <div style={{paddingBottom: '5rem', minHeight: '100vh', background: 'linear-gradient(135deg, #8D927D 0%, #493928 100%)'}}>
+                        <div style={{background: 'rgba(255,255,255,0.95)', padding: '1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.1)'}}>
+                            <h2 className="font-montserrat" style={{fontSize: '1.25rem', fontWeight: 'bold', color: '#313128'}}>Olá, {user?.name?.split(' ')[0] || 'Investidor'}! 👋</h2>
+                            <p style={{fontSize: '0.875rem', color: '#a0b5a8', marginTop: '0.25rem'}}>Bem-vindo ao seu tracker de ROI</p>
+                        </div>
+
+                        <div style={{padding: '1.5rem'}}>
+                            <div style={{background: 'white', borderRadius: '1rem', padding: '1.5rem', marginBottom: '1rem', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'}}>
+                                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                                    <div>
+                                        <p style={{fontSize: '0.875rem', color: '#a0b5a8'}}>Empreendimentos</p>
+                                        <p className="font-montserrat" style={{fontSize: '2rem', fontWeight: 'bold', color: '#8D927D'}}>{empreendimentos.length}</p>
+                                    </div>
+                                    <span style={{fontSize: '3rem'}}>🏢</span>
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={() => setScreen('simulador')}
+                                style={{width: '100%', background: 'white', border: '2px solid #8D927D', color: '#313128', padding: '1.25rem', borderRadius: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)', transition: 'all 0.3s', marginBottom: '1rem'}}
+                                onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                                onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                            >
+                                <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+                                    <span style={{fontSize: '1.75rem'}}>📊</span>
+                                    <div style={{textAlign: 'left'}}>
+                                        <p className="font-montserrat" style={{fontWeight: 'bold', fontSize: '1.125rem'}}>Simulador ROI</p>
+                                        <p style={{fontSize: '0.75rem', color: '#a0b5a8'}}>Calcule seus investimentos</p>
+                                    </div>
+                                </div>
+                                <span style={{fontSize: '1.875rem', color: '#493928'}}>→</span>
+                            </button>
+
+                            <button
+                                onClick={() => setScreen('empreendimentos')}
+                                style={{width: '100%', background: 'white', border: '2px solid #8D927D', color: '#313128', padding: '1.25rem', borderRadius: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)', transition: 'all 0.3s'}}
+                                onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                                onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                            >
+                                <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+                                    <span style={{fontSize: '1.75rem'}}>🏢</span>
+                                    <div style={{textAlign: 'left'}}>
+                                        <p className="font-montserrat" style={{fontWeight: 'bold', fontSize: '1.125rem'}}>Empreendimentos</p>
+                                        <p style={{fontSize: '0.75rem', color: '#a0b5a8'}}>Banco de lançamentos</p>
+                                    </div>
+                                </div>
+                                <span style={{fontSize: '1.875rem', color: '#493928'}}>→</span>
+                            </button>
+                        </div>
+                        <BottomNav />
+                    </div>
+                );
+            }
+
+            if (screen === 'simulador') {
+                return (
+                    <div style={{paddingBottom: '5rem', minHeight: '100vh', background: 'linear-gradient(135deg, #8D927D 0%, #493928 100%)'}}>
+                        <div style={{background: 'rgba(255,255,255,0.95)', padding: '1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', position: 'sticky', top: 0, zIndex: 10}}>
+                            <h1 className="font-montserrat" style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#313128'}}>📊 Simulador ROI</h1>
+                        </div>
+
+                        <div style={{padding: '1.5rem'}}>
+                            {!simResult ? (
+                                <div style={{background: 'white', borderRadius: '1rem', padding: '1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.1)'}}>
+                                    <h3 className="font-montserrat" style={{fontSize: '1.125rem', fontWeight: 'bold', color: '#313128', marginBottom: '1.5rem'}}>Dados do Investimento</h3>
+                                    
+                                    <div style={{display: 'grid', gap: '1rem'}}>
+                                        <div>
+                                            <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 'bold', color: '#313128', marginBottom: '0.5rem'}}>Valor do Imóvel (R$)</label>
+                                            <input 
+                                                type="number" 
+                                                value={simData.valorImovel}
+                                                onChange={(e) => setSimData({...simData, valorImovel: e.target.value})}
+                                                placeholder="350000"
+                                                style={{width: '100%', padding: '0.75rem', border: '2px solid #8D927D', borderRadius: '0.5rem', fontSize: '1rem'}} 
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 'bold', color: '#313128', marginBottom: '0.5rem'}}>Valor de Entrada (R$)</label>
+                                            <input 
+                                                type="number" 
+                                                value={simData.valorEntrada}
+                                                onChange={(e) => setSimData({...simData, valorEntrada: e.target.value})}
+                                                placeholder="70000"
+                                                style={{width: '100%', padding: '0.75rem', border: '2px solid #8D927D', borderRadius: '0.5rem', fontSize: '1rem'}} 
+                                            />
+                                        </div>
+
+                                        <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
+                                            <div>
+                                                <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 'bold', color: '#313128', marginBottom: '0.5rem'}}>Valorização Anual (%)</label>
+                                                <input 
+                                                    type="number" 
+                                                    value={simData.taxaValorizacao}
+                                                    onChange={(e) => setSimData({...simData, taxaValorizacao: e.target.value})}
+                                                    placeholder="5"
+                                                    style={{width: '100%', padding: '0.75rem', border: '2px solid #8D927D', borderRadius: '0.5rem', fontSize: '1rem'}} 
+                                                />
+                                            </div>
+                                            <div>
+                                                <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 'bold', color: '#313128', marginBottom: '0.5rem'}}>Período (anos)</label>
+                                                <input 
+                                                    type="number" 
+                                                    value={simData.periodoAnos}
+                                                    onChange={(e) => setSimData({...simData, periodoAnos: e.target.value})}
+                                                    placeholder="5"
+                                                    style={{width: '100%', padding: '0.75rem', border: '2px solid #8D927D', borderRadius: '0.5rem', fontSize: '1rem'}} 
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 'bold', color: '#313128', marginBottom: '0.5rem'}}>Aluguel Mensal (R$)</label>
+                                            <input 
+                                                type="number" 
+                                                value={simData.aluguelMensal}
+                                                onChange={(e) => setSimData({...simData, aluguelMensal: e.target.value})}
+                                                placeholder="1500"
+                                                style={{width: '100%', padding: '0.75rem', border: '2px solid #8D927D', borderRadius: '0.5rem', fontSize: '1rem'}} 
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 'bold', color: '#313128', marginBottom: '0.5rem'}}>Custos Mensais (R$)</label>
+                                            <input 
+                                                type="number" 
+                                                value={simData.custosMensais}
+                                                onChange={(e) => setSimData({...simData, custosMensais: e.target.value})}
+                                                placeholder="300"
+                                                style={{width: '100%', padding: '0.75rem', border: '2px solid #8D927D', borderRadius: '0.5rem', fontSize: '1rem'}} 
+                                            />
+                                            <p style={{fontSize: '0.75rem', color: '#a0b5a8', marginTop: '0.25rem'}}>Condomínio, IPTU, manutenção</p>
+                                        </div>
+
+                                        <button 
+                                            onClick={calcularROI}
+                                            style={{width: '100%', background: 'linear-gradient(135deg, #8D927D, #493928)', color: 'white', border: 'none', padding: '1rem', borderRadius: '0.75rem', fontWeight: 'bold', fontSize: '1.125rem', cursor: 'pointer', marginTop: '1rem'}}
+                                        >
+                                            Calcular ROI
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div>
+                                    <div style={{background: 'white', borderRadius: '1rem', padding: '1.5rem', marginBottom: '1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.1)'}}>
+                                        <h3 className="font-montserrat" style={{fontSize: '1.25rem', fontWeight: 'bold', color: '#313128', marginBottom: '1rem'}}>Resultado da Simulação</h3>
+                                        
+                                        <div style={{background: '#f0f4f1', padding: '1.5rem', borderRadius: '0.75rem', marginBottom: '1.5rem', textAlign: 'center'}}>
+                                            <p style={{fontSize: '0.875rem', color: '#a0b5a8', marginBottom: '0.5rem'}}>ROI Total</p>
+                                            <p className="font-montserrat" style={{fontSize: '2.5rem', fontWeight: 'bold', color: '#8D927D'}}>
+                                                {simResult.roi.toFixed(1)}%
+                                            </p>
+                                            <p style={{fontSize: '0.875rem', color: '#a0b5a8', marginTop: '0.25rem'}}>
+                                                {simResult.roiAnual.toFixed(1)}% ao ano
+                                            </p>
+                                        </div>
+
+                                        <div style={{display: 'grid', gap: '1rem'}}>
+                                            <div style={{padding: '1rem', background: '#f9faf9', borderRadius: '0.5rem'}}>
+                                                <p style={{fontSize: '0.875rem', color: '#a0b5a8'}}>Investimento Inicial</p>
+                                                <p className="font-montserrat" style={{fontSize: '1.25rem', fontWeight: 'bold', color: '#313128'}}>
+                                                    R$ {simResult.investimentoInicial.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                                </p>
+                                            </div>
+
+                                            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
+                                                <div style={{padding: '1rem', background: '#f9faf9', borderRadius: '0.5rem'}}>
+                                                    <p style={{fontSize: '0.875rem', color: '#a0b5a8'}}>Valor Atual</p>
+                                                    <p className="font-montserrat" style={{fontSize: '1rem', fontWeight: 'bold', color: '#313128'}}>
+                                                        R$ {simResult.valorAtual.toLocaleString('pt-BR', {minimumFractionDigits: 0})}
+                                                    </p>
+                                                </div>
+                                                <div style={{padding: '1rem', background: '#f9faf9', borderRadius: '0.5rem'}}>
+                                                    <p style={{fontSize: '0.875rem', color: '#a0b5a8'}}>Valor Futuro</p>
+                                                    <p className="font-montserrat" style={{fontSize: '1rem', fontWeight: 'bold', color: '#8D927D'}}>
+                                                        R$ {simResult.valorFuturo.toLocaleString('pt-BR', {minimumFractionDigits: 0})}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div style={{padding: '1rem', background: '#f9faf9', borderRadius: '0.5rem'}}>
+                                                <p style={{fontSize: '0.875rem', color: '#a0b5a8'}}>Valorização do Imóvel</p>
+                                                <p className="font-montserrat" style={{fontSize: '1.25rem', fontWeight: 'bold', color: '#8D927D'}}>
+                                                    R$ {simResult.valorizacao.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                                </p>
+                                            </div>
+
+                                            {simResult.rendaAluguel > 0 && (
+                                                <div style={{padding: '1rem', background: '#f9faf9', borderRadius: '0.5rem'}}>
+                                                    <p style={{fontSize: '0.875rem', color: '#a0b5a8'}}>Renda de Aluguel (líquida)</p>
+                                                    <p className="font-montserrat" style={{fontSize: '1.25rem', fontWeight: 'bold', color: '#8D927D'}}>
+                                                        R$ {simResult.rendaAluguel.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            <div style={{padding: '1.5rem', background: 'linear-gradient(135deg, #8D927D, #493928)', borderRadius: '0.75rem'}}>
+                                                <p style={{fontSize: '0.875rem', color: 'rgba(255,255,255,0.9)', marginBottom: '0.5rem'}}>Ganho Total Estimado</p>
+                                                <p className="font-montserrat" style={{fontSize: '1.75rem', fontWeight: 'bold', color: 'white'}}>
+                                                    R$ {simResult.ganhoTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <button 
+                                        onClick={() => {
+                                            setSimResult(null);
+                                            setSimData({valorImovel: '', valorEntrada: '', taxaValorizacao: '5', periodoAnos: '5', aluguelMensal: '', custosMensais: ''});
+                                        }}
+                                        style={{width: '100%', background: 'white', border: '2px solid #8D927D', color: '#313128', padding: '1rem', borderRadius: '0.75rem', fontWeight: 'bold', cursor: 'pointer'}}
+                                    >
+                                        Nova Simulação
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        <BottomNav />
+                    </div>
+                );
+            }
+
+            if (screen === 'empreendimentos') {
+                return (
+                    <div style={{paddingBottom: '5rem', minHeight: '100vh', background: 'linear-gradient(135deg, #8D927D 0%, #493928 100%)'}}>
+                        <div style={{background: 'rgba(255,255,255,0.95)', padding: '1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', position: 'sticky', top: 0, zIndex: 10}}>
+                            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                                <h1 className="font-montserrat" style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#313128'}}>🏢 Empreendimentos</h1>
+                                <button
+                                    onClick={() => setEditingEmp({})}
+                                    style={{background: '#8D927D', color: 'white', border: 'none', padding: '0.75rem 1.5rem', borderRadius: '0.5rem', fontWeight: 'bold', cursor: 'pointer'}}
+                                >
+                                    + Adicionar
+                                </button>
+                            </div>
+                        
